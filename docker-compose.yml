@@ -10,7 +10,7 @@ services:
       - "3306:3306"
     environment:
       MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: entrepriseManager
+      MYSQL_DATABASE: entreprise_manager
       MYSQL_USER: user
       MYSQL_PASSWORD: password
     volumes:
