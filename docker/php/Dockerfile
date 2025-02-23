@@ -10,15 +10,20 @@ RUN apt-get update && apt-get install -y \
     curl \
     libpng-dev \
     libonig-dev \
-    libxml2-dev \
     zip \
     unzip \
-    sudo
-
+    sudo \
+    procps \
+    net-tools && \
+    rm -rf /var/lib/apt/lists/*
 # Installer les extensions PHP
 RUN docker-php-ext-install pdo pdo_mysql mbstring exif pcntl bcmath gd
 
-# Valider que les variables sont des nombres
+# Installer Symfony CLI
+RUN curl -sS https://get.symfony.com/cli/installer | bash && \
+    mv /root/.symfony5/bin/symfony /usr/local/bin/symfony
+
+# Valider les ID utilisateur/groupe
 RUN if ! echo "${USER_ID}" | grep -qE '^[0-9]+$'; then \
         echo "ERROR: USER_ID must be a number"; exit 1; \
     fi && \
@@ -26,7 +31,7 @@ RUN if ! echo "${USER_ID}" | grep -qE '^[0-9]+$'; then \
         echo "ERROR: GROUP_ID must be a number"; exit 1; \
     fi
 
-# Créer le groupe et l'utilisateur
+# Créer l'utilisateur et le groupe
 RUN groupadd -g ${GROUP_ID} appuser && \
     useradd -u ${USER_ID} -g appuser -m appuser && \
     mkdir -p /home/appuser/.composer/vendor/bin && \
@@ -34,24 +39,23 @@ RUN groupadd -g ${GROUP_ID} appuser && \
     usermod -aG sudo appuser && \
     echo 'appuser ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
-# Installer Composer en tant qu'utilisateur non-root
+# Installer Composer
 USER appuser
 WORKDIR /var/www/html
 
-# Installer Composer localement
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/home/appuser/.composer/vendor/bin --filename=composer
 
-# Ajouter Composer au PATH
 ENV PATH="/home/appuser/.composer/vendor/bin:${PATH}"
 
-# Copier les fichiers du projet
+# Copier le code source
 COPY --chown=appuser:appuser backend /var/www/html
 
 # Installer les dépendances
 RUN composer install --no-interaction --optimize-autoloader
 
-# Revenir à root pour le CMD
-USER root
-
+# Configuration finale
 EXPOSE 9000
-CMD ["php-fpm"]
+
+CMD ["symfony", "server:start", "--port=9001", "--allow-http", "--no-tls", "--allow-all-ip"]
+
+
